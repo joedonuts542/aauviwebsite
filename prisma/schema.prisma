@@ -1,0 +1,555 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgres"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String   @id @unique @default(cuid())
+  robloxId          String   @unique
+  name              String
+  nickname          String
+  preferredUsername String
+  email             String?
+  verified          Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  isActive          Boolean  @default(true)
+
+  //Restrictions
+  beta    Boolean @default(true)
+  access  Boolean @default(false)
+  admin   Boolean @default(false)
+  banned  Boolean @default(false)
+  support Boolean @default(false)
+
+  status            UserStatus
+  groups            GroupUser[]
+  sessions          UserSession[]
+  messages          GroupMessage[]
+  activites         GroupActivity[]
+  vacations         GroupVacation[]
+  modifiedVacations GroupVacation[]  @relation("vacation")
+  alerts            GroupAlert[]     @relation("alert")
+  createdAlerts     GroupAlert[]
+  rankings          GroupRanking[]
+  createdEvents     GroupEvent[]
+  events            GroupEvent[]     @relation("attendee")
+  archives          GroupArchive[]
+  cards             GroupCard[]
+  reports           Report[]
+  tickets           GroupTicket[]
+  ticketResponses   TicketResponse[]
+
+  @@index(id)
+  @@index(robloxId)
+  @@index(email)
+}
+
+model UserSession {
+  id        String   @id @unique @default(cuid())
+  cookie    String   @unique
+  iv        String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  expired   Boolean  @default(false)
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@index(id)
+}
+
+model UserRole {
+  id              String      @id @unique @default(cuid())
+  name            String
+  description     String?     @db.VarChar(100)
+  level           Int         @unique
+  admin           Boolean     @default(false)
+  publicRelations Boolean     @default(false)
+  humanResources  Boolean     @default(false)
+  developer       Boolean     @default(false)
+  review          Boolean     @default(false)
+  support         Boolean     @default(false)
+  users           GroupUser[]
+
+  @@index(id)
+  @@index(level)
+}
+
+model GroupUser {
+  id        String   @id @unique @default(cuid())
+  userId    String
+  groupId   String
+  roleId    String
+  totalTime Int      @default(0)
+  user      User     @relation(fields: [userId], references: [id])
+  group     Group    @relation(fields: [groupId], references: [id])
+  role      UserRole @relation(fields: [roleId], references: [id])
+}
+
+model Group {
+  id           String   @id @unique @default(cuid())
+  name         String   @db.VarChar(200)
+  description  String?  @db.VarChar(1000)
+  discordUrl   String?  @db.VarChar(100)
+  groupId      String   @unique
+  verified     Boolean  @default(false)
+  unlimited    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  syncedAt     DateTime @default(now())
+  primaryColor String   @default("#7c3aed") @db.VarChar(7)
+
+  //Nodes
+  nodeTracking     Boolean @default(false)
+  nodeEvents       Boolean @default(false)
+  nodeVacations    Boolean @default(false)
+  nodeAlerts       Boolean @default(false)
+  nodePartners     Boolean @default(false)
+  nodeApplications Boolean @default(false)
+  nodeAnalytics    Boolean @default(false)
+  nodeBoard        Boolean @default(false)
+  nodeFeedback     Boolean @default(false)
+  nodeHelpdesk     Boolean @default(false)
+  nodeAbuse        Boolean @default(false)
+
+  //Settings
+  trackingRank Int?
+  apiToken     String? @unique
+
+  //Human Resources
+  hostEvents          Int?
+  joinEvents          Int?
+  maxHelpers          Int?
+  activityRequirement Int?
+  sessionRequirement  Int?
+  suspensionRank      Int?
+  terminateAlerts     Int    @default(3)
+  defaultWarning      String @default("You have been given a warning for failing to complete this group's minimum activity requirement.") @db.VarChar(300)
+  defaultTermination  String @default("You have been terminated for consistently failing to complete this group's minimum activity requirements.") @db.VarChar(300)
+
+  //Relations
+  users        GroupUser[]
+  places       GroupPlace[]
+  messages     GroupMessage[]
+  activities   GroupActivity[]
+  vacations    GroupVacation[]
+  alerts       GroupAlert[]
+  rankings     GroupRanking[]
+  events       GroupEvent[]
+  archives     GroupArchive[]
+  times        GroupTimes[]
+  cards        GroupCard[]
+  monitors     GroupMonitor[]
+  applications GroupApplication[]
+  feedback     GroupFeedback[]
+  tickets      GroupTicket[]
+  ticketTypes  TicketType[]
+
+  @@index(id)
+  @@index(groupId)
+}
+
+model GroupMessage {
+  id        String   @id @unique @default(cuid())
+  groupId   String
+  title     String   @db.VarChar(200)
+  body      String   @db.VarChar(1000)
+  link      String?  @db.VarChar(100)
+  createdAt DateTime @default(now())
+  createdBy String
+  isActive  Boolean  @default(true)
+  group     Group    @relation(fields: [groupId], references: [id])
+  author    User     @relation(fields: [createdBy], references: [id])
+
+  @@index(id)
+  @@index(groupId)
+  @@index(createdBy)
+}
+
+model GroupActivity {
+  id        String    @id @unique @default(cuid())
+  groupId   String
+  robloxId  String
+  placeId   String?
+  start     DateTime  @default(now())
+  end       DateTime?
+  length    Float?
+  createdAt DateTime  @default(now())
+  createdBy String?
+  isActive  Boolean   @default(true)
+  archived  Boolean   @default(false)
+  group     Group     @relation(fields: [groupId], references: [id])
+  author    User?     @relation(fields: [createdBy], references: [id])
+
+  @@index(id)
+  @@index(groupId)
+  @@index(start)
+  @@index(length)
+  @@index(archived)
+  @@index(isActive)
+}
+
+model GroupVacation {
+  id          String         @id @unique @default(cuid())
+  groupId     String
+  start       DateTime
+  end         DateTime
+  description String         @db.VarChar(500)
+  status      VacationStatus @default(PENDING)
+  createdAt   DateTime       @default(now())
+  createdBy   String
+  modifiedBy  String?
+  group       Group          @relation(fields: [groupId], references: [id])
+  author      User           @relation(fields: [createdBy], references: [id])
+  modifier    User?          @relation("vacation", fields: [modifiedBy], references: [id])
+
+  @@index(id)
+  @@index(groupId)
+  @@index(start)
+  @@index(end)
+  @@index(createdBy)
+  @@index(status)
+}
+
+model GroupAlert {
+  id          String    @id @unique @default(cuid())
+  groupId     String
+  title       String    @db.VarChar(200)
+  description String    @db.VarChar(500)
+  type        AlertType @default(WARNING)
+  start       DateTime? @default(now())
+  end         DateTime?
+  targetId    String
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  createdBy   String
+  group       Group     @relation(fields: [groupId], references: [id])
+  author      User      @relation(fields: [createdBy], references: [id])
+  target      User      @relation("alert", fields: [targetId], references: [id])
+
+  @@index(id)
+  @@index(groupId)
+  @@index(start)
+  @@index(end)
+  @@index(targetId)
+  @@index(type)
+}
+
+model GroupRanking {
+  id          String   @id @unique @default(cuid())
+  groupId     String
+  robloxId    String
+  from        Int
+  to          Int
+  description String   @db.VarChar(500)
+  createdAt   DateTime @default(now())
+  createdBy   String?
+  group       Group    @relation(fields: [groupId], references: [id])
+  author      User?    @relation(fields: [createdBy], references: [id])
+
+  @@index(id)
+  @@index(groupId)
+  @@index(robloxId)
+}
+
+model GroupEvent {
+  id          String    @id @unique @default(cuid())
+  groupId     String
+  title       String    @db.VarChar(100)
+  description String    @db.VarChar(500)
+  location    String?   @db.VarChar(100)
+  type        EventType @default(SESSION)
+  start       DateTime  @default(now())
+  end         DateTime
+  archived    Boolean   @default(false)
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  createdBy   String
+  group       Group     @relation(fields: [groupId], references: [id])
+  author      User      @relation(fields: [createdBy], references: [id])
+  users       User[]    @relation("attendee")
+
+  @@index(id)
+  @@index(groupId)
+  @@index(start)
+  @@index(isActive)
+  @@index(createdBy)
+}
+
+model GroupArchive {
+  id             String   @id @unique @default(cuid())
+  groupId        String
+  alertCount     Int      @default(0)
+  terminateCount Int      @default(0)
+  createdAt      DateTime @default(now())
+  createdBy      String
+  group          Group    @relation(fields: [groupId], references: [id])
+  author         User     @relation(fields: [createdBy], references: [id])
+
+  @@index(id)
+  @@index(groupId)
+  @@index(createdBy)
+}
+
+model GroupTimes {
+  id      String @id @unique @default(cuid())
+  display String
+  value   String
+  groupId String
+  group   Group  @relation(fields: [groupId], references: [id])
+
+  @@index(id)
+  @@index(groupId)
+}
+
+model GroupMonitor {
+  id            String   @id @unique @default(cuid())
+  groupId       String
+  userCount     Int
+  employeeCount Int
+  avgChats      Int
+  avgTime       Int
+  avgCount      Int      @default(1)
+  createdAt     DateTime
+  group         Group    @relation(fields: [groupId], references: [id])
+
+  @@index(id)
+  @@index(groupId)
+  @@index(createdAt)
+}
+
+model GroupApplication {
+  id          String                @id @unique @default(cuid())
+  groupId     String                
+  title       String                @db.VarChar(100)
+  description String                @db.VarChar(500)
+  submitText  String                @default("Thank you, your response has now been recorded!") @db.VarChar(100)
+  quiz        Boolean               @default(false)
+  isActive    Boolean               @default(false)
+  createdAt   DateTime              @default(now())
+  group       Group                 @relation(fields: [groupId], references: [id])
+  questions   ApplicationQuestion[]
+  instances   ApplicationInstance[]
+
+  @@index(id)
+  @@index(groupId)
+}
+
+model ApplicationQuestion {
+  id            String             @id @unique @default(cuid())
+  applicationId String
+  title         String             @db.VarChar(100)
+  description   String?            @db.VarChar(500)
+  type          QuestionType
+  options       String[]
+  correct       String?            @db.VarChar(300)
+  weight        Int                @default(1)
+  required      Boolean            @default(false)
+  application   GroupApplication   @relation(fields: [applicationId], references: [id])
+  instances     QuestionInstance[]
+}
+
+model ApplicationInstance {
+  id            String             @id @unique @default(cuid())
+  applicationId String
+  userId        String?
+  userName      String?            @db.VarChar(20)
+  points        Int?
+  createdAt     DateTime           @default(now())
+  status        ApplicationStatus  @default(PENDING)
+  questions     QuestionInstance[]
+  application   GroupApplication   @relation(fields: [applicationId], references: [id])
+}
+
+model QuestionInstance {
+  id          String              @id @unique @default(cuid())
+  instanceId  String
+  questionId  String
+  response    String              @db.VarChar(1000)
+  application ApplicationInstance @relation(fields: [instanceId], references: [id])
+  question    ApplicationQuestion @relation(fields: [questionId], references: [id])
+}
+
+model GroupCard {
+  id          String     @id @unique @default(cuid())
+  title       String     @db.VarChar(100)
+  description String     @db.VarChar(500)
+  type        CardType
+  status      CardStatus @default(TO_DO)
+  links       String[]
+  dueAt       DateTime?
+  groupId     String
+  createdBy   String
+  createdAt   DateTime   @default(now())
+  isActive    Boolean    @default(false)
+  tasks       CardTask[]
+  group       Group      @relation(fields: [groupId], references: [id])
+  author      User       @relation(fields: [createdBy], references: [id])
+
+  @@index(id)
+  @@index(groupId)
+  @@index(createdBy)
+}
+
+model CardTask {
+  id        String    @id @unique @default(cuid())
+  name      String    @db.VarChar(200)
+  completed Boolean   @default(false)
+  cardId    String
+  card      GroupCard @relation(fields: [cardId], references: [id])
+}
+
+model GroupPlace {
+  id            String          @id @unique @default(cuid())
+  groupId       String
+  placeId       String
+  placeName     String
+  averageRating Float           @default(5.0)
+  averageTime   Int             @default(0)
+  ratingEntries Int             @default(0)
+  timeEntries   Int             @default(0)
+  createdAt     DateTime        @default(now())
+  isActive      Boolean         @default(true)
+  group         Group           @relation(fields: [groupId], references: [id])
+  feedback      GroupFeedback[]
+}
+
+model GroupFeedback {
+  id          String     @id @unique @default(cuid())
+  groupId     String
+  description String     @db.VarChar(500)
+  rating      Float
+  placeId     String
+  isActive    Boolean    @default(false)
+  createdAt   DateTime   @default(now())
+  createdBy   String
+  group       Group      @relation(fields: [groupId], references: [id])
+  place       GroupPlace @relation(fields: [placeId], references: [id])
+
+  @@unique([groupId, createdBy, placeId])
+  @@index(id)
+  @@index(groupId)
+}
+
+model GroupTicket {
+  id          String           @id @unique @default(cuid())
+  groupId     String
+  title       String           @db.VarChar(100)
+  description String           @db.VarChar(500)
+  typeId      String
+  createdAt   DateTime         @default(now())
+  createdBy   String
+  isActive    Boolean          @default(true)
+  group       Group            @relation(fields: [groupId], references: [id])
+  user        User             @relation(fields: [createdBy], references: [id])
+  type        TicketType       @relation(fields: [typeId], references: [id])
+  responses   TicketResponse[]
+}
+
+model TicketResponse {
+  id        String      @id @unique @default(cuid())
+  ticketId  String
+  message   String      @db.VarChar(500)
+  createdAt DateTime    @default(now())
+  createdBy String
+  ticket    GroupTicket @relation(fields: [ticketId], references: [id])
+  user      User        @relation(fields: [createdBy], references: [id])
+}
+
+model TicketType {
+  id        String        @id @unique @default(cuid())
+  groupId   String
+  name      String        @db.VarChar(100)
+  createdAt DateTime      @default(now())
+  group     Group         @relation(fields: [groupId], references: [id])
+  tickets   GroupTicket[]
+}
+
+model Report {
+  id          String         @id @unique @default(cuid())
+  description String         @db.VarChar(500)
+  category    ReportCategory
+  type        ReportType     @default(GROUP)
+  targetId    String
+  reviewed    Boolean        @default(false)
+  createdBy   String
+  createdAt   DateTime       @default(now())
+  author      User           @relation(fields: [createdBy], references: [id])
+
+  @@index(id)
+  @@index(createdBy)
+}
+
+enum EventType {
+  TRAINING
+  INTERVIEW
+  SESSION
+  MEETING
+}
+
+enum RankingType {
+  MANUAL
+  AUTOMATED
+  SYSTEM
+}
+
+enum AlertType {
+  WARNING
+  TERMINATION
+  SUSPENSION
+}
+
+enum VacationStatus {
+  PENDING
+  DENIED
+  APPROVED
+}
+
+enum UserStatus {
+  OFFLINE
+  ONLINE
+  INACTIVE
+}
+
+enum CardStatus {
+  TO_DO
+  IN_PROGRESS
+  IN_TESTING
+  COMPLETED
+}
+
+enum CardType {
+  SUGGESTION
+  DEPLOYMENT
+  RELEASE
+  FEATURE
+  EVENT
+  BUG
+}
+
+enum ReportType {
+  GROUP
+  MESSAGE
+  USER
+}
+
+enum ReportCategory {
+  INAPPROPRIATE_CONTENT
+  UNOFFICIAL_COPY
+  ALT_ACCOUNT
+  SPAM
+}
+
+enum QuestionType {
+  TEXT
+  SELECT
+  CHECK
+}
+
+enum ApplicationStatus {
+  PENDING
+  ACCEPTED
+  DENIED
+}
